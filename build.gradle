@@ -12,6 +12,7 @@ repositories {
 dependencies {
     // https://mvnrepository.com/artifact/org.projectlombok/lombok
     compileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.36'
+    annotationProcessor 'org.projectlombok:lombok:1.18.36'
 // https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api
     compileOnly group: 'javax.servlet', name: 'javax.servlet-api', version: '4.0.1'
 
@@ -29,4 +30,8 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+build {
+
 }

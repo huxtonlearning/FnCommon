@@ -1,7 +1,10 @@
 package com.huxton.common.exceptions;
 
+import com.huxton.common.utils.SendMessageTelegram;
 import io.grpc.StatusRuntimeException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +31,10 @@ import java.util.Map;
 import static org.springframework.http.HttpStatus.*;
 
 @ControllerAdvice
+@RequiredArgsConstructor
 public class GlobalHandleException extends ResponseEntityExceptionHandler {
+
+    private final SendMessageTelegram sendMessageTelegram;
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ExceptionResponse> globalExceptionHandler(Exception ex, HttpServletRequest request) {
@@ -42,6 +48,7 @@ public class GlobalHandleException extends ResponseEntityExceptionHandler {
             exceptionResponse.setStatus(BAD_REQUEST.value());
             exceptionResponse.setMessage("Invalid argument");
             exceptionResponse.setMessageCode(BAD_REQUEST.toString());
+
             exceptionResponse.setPath(request.getServletPath());
         } else {
             exceptionResponse = new ExceptionResponse(INTERNAL_SERVER_ERROR, new Date(), "Đã có lỗi xảy ra.", "INTERNAL_SERVER_ERROR", "Đã có lỗi xảy ra.", request.getServletPath());
@@ -108,6 +115,7 @@ public class GlobalHandleException extends ResponseEntityExceptionHandler {
                 msg.append("<b>BODY</b> : ").append(getBody(request));
             } catch (Exception ignored) {
             }
+            sendMessageTelegram.send(msg.toString());
         } catch (Exception ignore) {
         }
     }

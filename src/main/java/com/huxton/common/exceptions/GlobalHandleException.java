@@ -1,21 +1,21 @@
 package com.huxton.common.exceptions;
 
-//import com.ommanisoft.common.system.SendMessageTelegram;
-import org.springframework.beans.factory.annotation.Autowired;
+import io.grpc.StatusRuntimeException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-//import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,28 +25,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.*;
 
 @ControllerAdvice
 public class GlobalHandleException extends ResponseEntityExceptionHandler {
-//    @Autowired
-//    SendMessageTelegram sendMessageTelegram;
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ExceptionResponse> globalExceptionHandler(
-            Exception ex, HttpServletRequest request) {
+    public ResponseEntity<ExceptionResponse> globalExceptionHandler(Exception ex, HttpServletRequest request) {
         sendNotification(ex, request);
-        if (ex instanceof ExceptionOm) {
-            ExceptionOm exceptionOm = (ExceptionOm) ex;
-            ExceptionResponse exceptionResponse =
-                    new ExceptionResponse(
-                            exceptionOm.status,
-                            new Date(),
-                            exceptionOm.getMessage(),
-                            exceptionOm.messageCode,
-                            exceptionOm.getMessage(),
-                            request.getServletPath());
+        if (ex instanceof ExceptionOm exceptionOm) {
+            ExceptionResponse exceptionResponse = new ExceptionResponse(exceptionOm.status, new Date(), exceptionOm.getMessage(), exceptionOm.messageCode, exceptionOm.getMessage(), request.getServletPath());
             return new ResponseEntity<>(exceptionResponse, exceptionOm.status);
         }
         ExceptionResponse exceptionResponse = new ExceptionResponse();
@@ -56,143 +44,114 @@ public class GlobalHandleException extends ResponseEntityExceptionHandler {
             exceptionResponse.setMessageCode(BAD_REQUEST.toString());
             exceptionResponse.setPath(request.getServletPath());
         } else {
-            new ExceptionResponse(
-                    INTERNAL_SERVER_ERROR,
-                    new Date(),
-                    "Đã có lỗi xảy ra.",
-                    "INTERNAL_SERVER_ERROR",
-                    "Đã có lỗi xảy ra.",
-                    request.getServletPath());
+            exceptionResponse = new ExceptionResponse(INTERNAL_SERVER_ERROR, new Date(), "Đã có lỗi xảy ra.", "INTERNAL_SERVER_ERROR", "Đã có lỗi xảy ra.", request.getServletPath());
         }
 
         return new ResponseEntity<>(exceptionResponse, HttpStatus.valueOf(exceptionResponse.getStatus()));
     }
 
+    @ExceptionHandler(StatusRuntimeException.class)
+    public ResponseEntity<ExceptionResponse> handleGrpcException(StatusRuntimeException ex, HttpServletRequest request) {
+        HttpStatus status;
+        String message;
+
+        switch (ex.getStatus().getCode()) {
+            case NOT_FOUND -> {
+                status = HttpStatus.NOT_FOUND;
+                message = "Resource not found: " + ex.getStatus().getDescription();
+            }
+            case INVALID_ARGUMENT -> {
+                status = HttpStatus.BAD_REQUEST;
+                message = "Invalid argument: " + ex.getStatus().getDescription();
+            }
+            case UNAVAILABLE -> {
+                status = HttpStatus.SERVICE_UNAVAILABLE;
+                message = "Service unavailable: " + ex.getStatus().getDescription();
+            }
+            case PERMISSION_DENIED -> {
+                status = HttpStatus.FORBIDDEN;
+                message = "Permission denied: " + ex.getStatus().getDescription();
+            }
+            default -> {
+                status = HttpStatus.INTERNAL_SERVER_ERROR;
+                message = "gRPC error: " + ex.getStatus().getDescription();
+            }
+        }
+
+        ExceptionResponse exceptionResponse = new ExceptionResponse(status, new Date(), message, ex.getStatus().getCode().name(), ex.getMessage(), request.getServletPath());
+
+        return new ResponseEntity<>(exceptionResponse, status);
+    }
+
     private void sendNotification(Exception ex, HttpServletRequest request) {
         try {
             String logLevel = "ERROR";
-            String msg = "";
-            if (ex instanceof ExceptionOm) {
-                ExceptionOm exceptionOm = (ExceptionOm) ex;
+            StringBuilder msg = new StringBuilder();
+            if (ex instanceof ExceptionOm exceptionOm) {
                 if (exceptionOm.status.value() < 500) {
                     return;
-//          msg += "<b>WARNING</b> : " + ex.getMessage() + "(" + exceptionOm.status.value() + ") \n";
                 } else {
-                    msg += "<b>ERROR</b> : " + ex.getMessage() + "(" + exceptionOm.status.value() + ") \n";
+                    msg.append("<b>ERROR</b> : ").append(ex.getMessage()).append(" (").append(exceptionOm.status.value()).append(") \n");
                 }
             } else {
-                msg += "<b>ERROR</b> : " + ex.getMessage() + " \n";
+                msg.append("<b>ERROR</b> : ").append(ex.getMessage()).append(" \n");
             }
             try {
-                msg += "<b>METHOD</b> : " + request.getMethod() + " \n";
+                msg.append("<b>METHOD</b> : ").append(request.getMethod()).append(" \n");
             } catch (Exception ignored) {
             }
             try {
-                msg += "<b>URI</b> : " + request.getRequestURL().toString() + " \n";
+                msg.append("<b>URI</b> : ").append(request.getRequestURL().toString()).append(" \n");
             } catch (Exception ignored) {
             }
             try {
-                msg += "<b>BODY</b> : " + getBody(request);
+                msg.append("<b>BODY</b> : ").append(getBody(request));
             } catch (Exception ignored) {
             }
-//            sendMessageTelegram.send(msg);
         } catch (Exception ignore) {
         }
     }
 
     public static String getBody(HttpServletRequest request) throws IOException {
-
-        String body = null;
         StringBuilder stringBuilder = new StringBuilder();
-        BufferedReader bufferedReader = null;
-
-        try {
-            InputStream inputStream = request.getInputStream();
-            if (inputStream != null) {
-                bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-                char[] charBuffer = new char[128];
-                int bytesRead = -1;
-                while ((bytesRead = bufferedReader.read(charBuffer)) > 0) {
-                    stringBuilder.append(charBuffer, 0, bytesRead);
-                }
-            } else {
-                stringBuilder.append("");
-            }
-        } catch (IOException ex) {
-            throw ex;
-        } finally {
-            if (bufferedReader != null) {
-                try {
-                    bufferedReader.close();
-                } catch (IOException ex) {
-                    throw ex;
-                }
+        try (InputStream inputStream = request.getInputStream(); BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream))) {
+            char[] charBuffer = new char[128];
+            int bytesRead;
+            while ((bytesRead = bufferedReader.read(charBuffer)) > 0) {
+                stringBuilder.append(charBuffer, 0, bytesRead);
             }
         }
-
-        body = stringBuilder.toString();
-        return body;
+        return stringBuilder.toString();
     }
 
     @Override
-    protected ResponseEntity<Object> handleMethodArgumentNotValid(
-            MethodArgumentNotValidException ex,
-            HttpHeaders headers,
-            HttpStatus status,
-            WebRequest request) {
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpHeaders headers, org.springframework.http.HttpStatusCode status, // Sử dụng HttpStatusCode thay vì HttpStatus
+                                                                  WebRequest request) {
         Error validDetails = new Error();
         Map<String, String> message = new HashMap<>();
-        if (ex instanceof MethodArgumentNotValidException) {
-            List<FieldError> fieldErrors = ex.getBindingResult().getFieldErrors();
-            for (FieldError fieldError : fieldErrors) {
-                message.put(fieldError.getField(), fieldError.getDefaultMessage());
-            }
-            validDetails.setMessage(message);
-        } else {
-            message.put("default", ex.getLocalizedMessage());
-            validDetails.setMessage(message);
+
+        List<FieldError> fieldErrors = ex.getBindingResult().getFieldErrors();
+        for (FieldError fieldError : fieldErrors) {
+            message.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
-        validDetails.setStatus(HttpStatus.BAD_REQUEST.value());
+        validDetails.setMessage(message);
+        validDetails.setStatus(status.value());
         validDetails.setTimestamp(new Date());
         validDetails.setError("Not valid exception");
         validDetails.setPath(((ServletWebRequest) request).getRequest().getServletPath());
-        return new ResponseEntity(validDetails, status);
+
+        return new ResponseEntity<>(validDetails, headers, status);
     }
 
     @Override
-    protected ResponseEntity<Object> handleHttpMessageNotReadable(
-            HttpMessageNotReadableException ex,
-            HttpHeaders headers,
-            HttpStatus status,
-            WebRequest request) {
-        ExceptionResponse exceptionResponse =
-                new ExceptionResponse(
-                        BAD_REQUEST,
-                        new Date(),
-                        "Malformed JSON request",
-                        "MALFORMED_JSON_REQUEST",
-                        ex.getLocalizedMessage(),
-                        ((ServletWebRequest) request).getRequest().getServletPath());
-        return new ResponseEntity<>((Object) exceptionResponse, BAD_REQUEST);
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, HttpHeaders headers, org.springframework.http.HttpStatusCode status, // Đổi HttpStatus thành HttpStatusCode
+                                                                  WebRequest request) {
+
+        HttpServletRequest httpRequest = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+
+        ExceptionResponse exceptionResponse = new ExceptionResponse((HttpStatus) status, new Date(), "Malformed JSON request", "MALFORMED_JSON_REQUEST", ex.getLocalizedMessage(), httpRequest.getServletPath());
+
+        return new ResponseEntity<>(exceptionResponse, headers, status);
     }
 
-//    @ExceptionHandler(MissingRequestHeaderException.class)
-//    public ResponseEntity<ExceptionResponse> handleException(MissingRequestHeaderException ex) {
-//        if (ex.getMessage().contains("x-om")) {
-//            ExceptionResponse errorDetails =
-//                    new ExceptionResponse(
-//                            HttpStatus.UNAUTHORIZED,
-//                            new Date(),
-//                            "unauthorized",
-//                            "UNAUTHORIZED",
-//                            "unauthorized",
-//                            null);
-//            return new ResponseEntity<>(errorDetails, HttpStatus.UNAUTHORIZED);
-//        }
-//        ExceptionResponse errorDetails =
-//                new ExceptionResponse(
-//                        HttpStatus.BAD_REQUEST, new Date(), ex.getMessage(), "MISSING_REQUEST_HEADER", ex.getMessage(), null);
-//
-//        return new ResponseEntity<>(errorDetails, BAD_REQUEST);
-//    }
 }

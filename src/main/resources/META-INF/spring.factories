@@ -1,2 +1,2 @@
-#org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-#com.huxton.common.configs.Config
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.huxton.common.configs.Config

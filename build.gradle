@@ -34,6 +34,9 @@ dependencies {
     compileOnly 'org.projectlombok:lombok:1.18.36'
     // https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api
     compileOnly group: 'javax.servlet', name: 'javax.servlet-api', version: '4.0.1'
+
+    runtimeOnly group: 'org.aspectj', name: 'aspectjweaver', version: '1.9.20'
+
     annotationProcessor 'org.projectlombok:lombok:1.18.36'
 
     testImplementation platform('org.junit:junit-bom:5.10.0')

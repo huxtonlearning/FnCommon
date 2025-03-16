@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Định dạng phiên bản hợp lệ (X.Y.Z)
 VERSION_FILE=".version"

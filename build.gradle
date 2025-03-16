@@ -22,6 +22,7 @@ dependencies {
     implementation 'io.grpc:grpc-protobuf:1.62.2'
     implementation 'net.devh:grpc-spring-boot-starter:3.0.0.RELEASE'
 
+
     compileOnly 'jakarta.servlet:jakarta.servlet-api:5.0.0'
 
     implementation 'jakarta.persistence:jakarta.persistence-api:3.1.0'
@@ -31,6 +32,8 @@ dependencies {
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.0'
 
     compileOnly 'org.projectlombok:lombok:1.18.36'
+    // https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api
+    compileOnly group: 'javax.servlet', name: 'javax.servlet-api', version: '4.0.1'
     annotationProcessor 'org.projectlombok:lombok:1.18.36'
 
     testImplementation platform('org.junit:junit-bom:5.10.0')

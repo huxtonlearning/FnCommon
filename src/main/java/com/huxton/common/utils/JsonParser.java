@@ -4,7 +4,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.net.URLDecoder;
 import java.util.*;
@@ -23,6 +25,8 @@ public class JsonParser {
 
     if (mObjectMapper == null) {
       mObjectMapper = new ObjectMapper();
+      mObjectMapper.registerModule(new JavaTimeModule());
+      mObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
       mObjectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
     return mObjectMapper;

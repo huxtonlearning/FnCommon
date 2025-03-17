@@ -16,8 +16,8 @@ if [ ! -f "$VERSION_FILE" ]; then
   echo "VERSION=$LATEST_GIT_VERSION" > "$VERSION_FILE"
 fi
 
-# Đọc phiên bản hiện tại từ file
-CURRENT_VERSION=$(grep -oP '(?<=VERSION=)[0-9]+\.[0-9]+\.[0-9]+' "$VERSION_FILE")
+# Đọc phiên bản hiện tại từ file (dùng grep -E thay vì -P)
+CURRENT_VERSION=$(grep -Eo 'VERSION=[0-9]+\.[0-9]+\.[0-9]+' "$VERSION_FILE" | cut -d '=' -f2)
 
 # Nếu không đọc được, sử dụng phiên bản từ Git
 if [ -z "$CURRENT_VERSION" ]; then
@@ -25,9 +25,9 @@ if [ -z "$CURRENT_VERSION" ]; then
 fi
 
 # Tách các phần của phiên bản (X.Y.Z)
-IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_GIT_VERSION"
+IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
 
-# Tăng phiên bản: nếu PATCH đạt 9 thì tăng MINOR, nếu MINOR đạt 9 thì tăng MAJOR
+# Tăng phiên bản
 PATCH=$((PATCH + 1))
 
 if [ "$PATCH" -ge 10 ]; then
@@ -42,20 +42,25 @@ fi
 
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 
-# Ghi phiên bản mới vào file .version
-echo "VERSION=$NEW_VERSION" > "$VERSION_FILE"
+# Kiểm tra nếu tag đã tồn tại
+if git tag | grep -q "v$NEW_VERSION"; then
+  echo "⚠️ Version $NEW_VERSION already exists. Skipping tag creation."
+else
+  # Ghi phiên bản mới vào file .version
+  echo "VERSION=$NEW_VERSION" > "$VERSION_FILE"
 
-# Commit thay đổi
-git add .
-git commit -m "Auto-increment version to $NEW_VERSION"
+  # Commit thay đổi
+  git add .
+  git commit -m "Auto-increment version to $NEW_VERSION"
 
-# Push code lên nhánh main
-git push origin main
+  # Push code lên nhánh main
+  git push origin main
 
-# Tạo tag mới
-git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+  # Tạo tag mới
+  git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
 
-# Push tag lên remote
-git push origin "$NEW_VERSION"
+  # Push tag lên remote
+  git push origin "$NEW_VERSION"
+fi
 
 echo "✅ Deployment completed with version $NEW_VERSION"
